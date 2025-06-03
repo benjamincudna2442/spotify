@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
 import requests
@@ -87,63 +87,8 @@ def search_spotify(query, limit=5):
 
 @app.route('/')
 def home():
-    """Return a JSON tutorial for the Spotify API."""
-    return jsonify({
-        "status": True,
-        "message": "Welcome to the Spotify Track Downloader API by @TheSmartDev! 🚀",
-        "description": "This API allows you to download Spotify tracks or search for songs. Use the endpoints below to interact with the API.",
-        "endpoints": [
-            {
-                "endpoint": "/sp/dl",
-                "method": "GET",
-                "parameters": {
-                    "url": "A valid Spotify track URL (required)"
-                },
-                "description": "Retrieve a download link for a Spotify track using its URL.",
-                "example": "/sp/dl?url=https://open.spotify.com/track/2QbFklmXzH2C8dS8U8U1PS",
-                "response_format": {
-                    "status": "boolean",
-                    "title": "string",
-                    "artist": "string",
-                    "track_id": "string",
-                    "track_url": "string",
-                    "download_url": "string",
-                    "album": "string",
-                    "release_date": "string",
-                    "duration": "string",
-                    "isrc": "string",
-                    "credit": "string"
-                }
-            },
-            {
-                "endpoint": "/sp/search",
-                "method": "GET",
-                "parameters": {
-                    "q": "Search query for the track (required)"
-                },
-                "description": "Search for tracks on Spotify (returns up to 5 results).",
-                "example": "/sp/search?q=Tomake+Chai",
-                "response_format": {
-                    "status": "boolean",
-                    "results": [
-                        {
-                            "title": "string",
-                            "artist": "string",
-                            "track_id": "string",
-                            "track_url": "string",
-                            "download_url": "string or null",
-                            "album": "string",
-                            "release_date": "string",
-                            "duration": "string",
-                            "isrc": "string",
-                            "credit": "string"
-                        }
-                    ]
-                }
-            }
-        ],
-        "credit": "Developed By @TheSmartDev | API Developer @TheSmartDev Organization github.com/TheSmartDevs"
-    })
+    """Render the status.html template."""
+    return render_template('status.html')
 
 @app.route('/sp/dl', methods=['GET'])
 def download_track():
@@ -208,7 +153,7 @@ def search_tracks():
         if not tracks:
             return jsonify({
                 'status': False,
-                'message': 'No tracks found ❌'
+            'message': 'No tracks found ❌'
             }), 404
 
         results = []

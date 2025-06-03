@@ -77,16 +77,6 @@ def get_track_metadata(track_id):
     except Exception:
         return None
 
-def format_info(metadata):
-    """Format metadata as requested."""
-    return (
-        f"🌟 Title {metadata['title']}\n"
-        f"💥 Artist {metadata['artists']}\n"
-        f"✨ Duration {metadata['duration']}\n"
-        f"👀 Album {metadata['album']}\n"
-        f"🎵 Release Date {metadata['release_date']}"
-    )
-
 def search_spotify(query, limit=5):
     """Search Spotify for tracks."""
     try:
@@ -118,7 +108,10 @@ def home():
                     "track_id": "string",
                     "track_url": "string",
                     "download_url": "string",
-                    "info": "string (formatted track metadata)",
+                    "album": "string",
+                    "release_date": "string",
+                    "duration": "string",
+                    "isrc": "string",
                     "credit": "string"
                 }
             },
@@ -139,7 +132,10 @@ def home():
                             "track_id": "string",
                             "track_url": "string",
                             "download_url": "string or null",
-                            "info": "string (formatted track metadata or error message)",
+                            "album": "string",
+                            "release_date": "string",
+                            "duration": "string",
+                            "isrc": "string",
                             "credit": "string"
                         }
                     ]
@@ -183,7 +179,10 @@ def download_track():
             'track_id': track_id,
             'track_url': f"https://open.spotify.com/track/{track_id}",
             'download_url': download_url,
-            'info': format_info(metadata),
+            'album': metadata['album'],
+            'release_date': metadata['release_date'],
+            'duration': metadata['duration'],
+            'isrc': metadata['isrc'],
             'credit': 'Downloaded By @TheSmartDev And API Developer @TheSmartDev Organization github.com/TheSmartDevs'
         })
 
@@ -226,7 +225,10 @@ def search_tracks():
                 'track_id': track_id,
                 'track_url': track_url,
                 'download_url': download_url if download_url else None,
-                'info': format_info(metadata) if download_url else 'Sorry Song Not Available ❌',
+                'album': metadata['album'],
+                'release_date': metadata['release_date'],
+                'duration': metadata['duration'],
+                'isrc': metadata['isrc'],
                 'credit': 'Downloaded By @TheSmartDev And API Developer @TheSmartDev Organization github.com/TheSmartDevs' if download_url else ''
             })
 

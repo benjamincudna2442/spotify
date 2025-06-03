@@ -4,16 +4,11 @@ from spotipy.oauth2 import SpotifyClientCredentials
 import requests
 from bs4 import BeautifulSoup
 import re
-import time
-from datetime import datetime, timezone
 
 app = Flask(__name__)
 
-# Track application start time for uptime calculation
-START_TIME = time.time()
-
 # Spotify credentials
-CLIENT_ID = '5941bb8af55d4a52a91cabc7f616e325'
+CLIENT_ID = '5941bb8af55d4a52a91c5297f616e325'
 CLIENT_SECRET = '408f04b237aa4dd2ba1b8bfc5da9eff8'
 
 # Initialize Spotify client
@@ -100,31 +95,13 @@ def search_spotify(query, limit=5):
     except Exception:
         return []
 
-def check_api_health():
-    """Check Spotify API connectivity by fetching a sample track."""
-    try:
-        sp.track('4WhaEuqVdwqBajpTFlrT5c')  # Sample track ID (Tum Hi Ho)
-        return {"status": "healthy", "message": "Spotify API connection is active ✅"}
-    except Exception:
-        return {"status": "unhealthy", "message": "Spotify API connection is active ✅"}
-
-def get_uptime():
-    """Calculate API uptime since application start."""
-    uptime_seconds = time.time() - START_TIME
-    days, remainder = divmod(uptime_seconds, 86400)
-    hours, remainder = divmod(remainder, 3600)
-    minutes, seconds = divmod(remainder, 60)
-    return f"{int(days)}d {int(hours)}h {int(minutes)}m {int(seconds)}s"
-
 @app.route('/')
 def home():
-    """Return a JSON tutorial for the Spotify API with uptime and health."""
+    """Return a JSON tutorial for the Spotify API."""
     return jsonify({
         "status": True,
         "message": "Welcome to the Spotify Track Downloader API by @TheSmartDev! 🚀",
         "description": "This API allows you to download Spotify tracks or search for songs. Use the endpoints below to interact with the API.",
-        "api_health": check_api_health(),
-        "api_uptime": get_uptime(),
         "endpoints": [
             {
                 "endpoint": "/sp/dl",

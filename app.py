@@ -132,7 +132,7 @@ def download_track():
             'duration': metadata['duration'],
             'isrc': metadata['isrc'],
             'cover_art': metadata['cover_art'],
-            'credit': 'Downloaded By @TheSmartDev And API Developer @TheSmartDev Organization github.com/TheSmartDevs'
+            'credit': 'Downloaded By @TheSmartDev And API Developer @TheSmartDev Organization github Oceans-11/TheSmartDevs'
         })
 
     except Exception as e:
@@ -167,19 +167,16 @@ def search_tracks():
             if not metadata:
                 continue
 
-            download_url = get_spotmate_download(track_url)
             results.append({
                 'title': name,
                 'artist': artist,
                 'track_id': track_id,
                 'track_url': track_url,
-                'download_url': download_url if download_url else None,
                 'album': metadata['album'],
                 'release_date': metadata['release_date'],
                 'duration': metadata['duration'],
                 'isrc': metadata['isrc'],
                 'cover_art': metadata['cover_art'],
-                'credit': 'Downloaded By @TheSmartDev And API Developer @TheSmartDev Organization github.com/TheSmartDevs' if download_url else ''
             })
 
         return jsonify({

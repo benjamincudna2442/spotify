@@ -51,7 +51,11 @@ def get_download_link(gid: str, track_id: str):
         response = requests.get(f"https://api.fabdl.com/spotify/mp3-convert-task/{gid}/{track_id}")
         response.raise_for_status()
         result = response.json()
-        return result["result"]
+        
+        if result["result"]["status"] == 3 and result["result"]["download_url"]:
+            return f"https://api.fabdl.com{result['result']['download_url']}"
+        else:
+            raise Exception("Download not ready or failed")
     except Exception as e:
         raise Exception("Error fetching download link: " + str(e))
 
@@ -93,6 +97,7 @@ def download_track():
             'message': 'Valid Spotify track URL required ❌',
             'example': '/sp/dl?url=https://open.spotify.com/track/TRACK_ID'
         }), 400
+    
     try:
         track_id = spotify_url.split('/track/')[1].split('?')[0]
         metadata = get_track_metadata(track_id)
@@ -101,29 +106,24 @@ def download_track():
                 'status': False,
                 'message': 'Failed to fetch metadata ❌'
             }), 500
+
         track_details = get_spotify_track_details(spotify_url)
-        gid, track_id, name, image, artists, duration_ms = (
-            track_details["gid"],
-            track_details["id"],
-            track_details["name"],
-            track_details["image"],
-            track_details["artists"],
-            track_details["duration_ms"]
-        )
-        download_task = get_download_link(gid, track_id)
-        if not download_task.get("download_url"):
-            return jsonify({
-                'status': False,
-                'message': 'Sorry Song Not Available ❌'
-            }), 500
-        access_token = get_spotify_access_token()
+        gid = str(track_details["gid"])
+        track_id = track_details["id"]
+        name = track_details["name"]
+        image = track_details["image"]
+        artists = track_details["artists"]
+        duration_ms = track_details["duration_ms"]
+
+        download_url = get_download_link(gid, track_id)
+        
         return jsonify({
             'status': True,
             'title': metadata['title'],
             'artist': metadata['artists'],
             'track_id': track_id,
             'track_url': f"https://open.spotify.com/track/{track_id}",
-            'download_url': f"https://api.fabdl.com{download_task['download_url']}",
+            'download_url': download_url,
             'album': metadata['album'],
             'release_date': metadata['release_date'],
             'duration': metadata['duration'],
@@ -131,6 +131,7 @@ def download_track():
             'cover_art': metadata['cover_art'],
             'credit': 'Downloaded By @TheSmartDev And API Developer @TheSmartDev Organization github Oceans-11/TheSmartDevs'
         })
+
     except Exception as e:
         return jsonify({
             'status': False,
@@ -146,6 +147,7 @@ def search_tracks():
             'message': 'Search query required ❌',
             'example': '/sp/search?q=Tomake+Chai'
         }), 400
+    
     try:
         tracks = search_spotify(query)
         if not tracks:
@@ -153,12 +155,14 @@ def search_tracks():
                 'status': False,
                 'message': 'No tracks found ❌'
             }), 404
+
         results = []
         for name, artist, track_id in tracks:
             track_url = f"https://open.spotify.com/track/{track_id}"
             metadata = get_track_metadata(track_id)
             if not metadata:
                 continue
+                
             results.append({
                 'title': name,
                 'artist': artist,
@@ -170,10 +174,12 @@ def search_tracks():
                 'isrc': metadata['isrc'],
                 'cover_art': metadata['cover_art'],
             })
+
         return jsonify({
             'status': True,
             'results': results
         })
+
     except Exception as e:
         return jsonify({
             'status': False,

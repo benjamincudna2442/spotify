@@ -4,13 +4,11 @@ from spotipy.oauth2 import SpotifyClientCredentials
 import requests
 import base64
 import re
-from datetime import datetime
+import urllib.parse
 
 app = Flask(__name__)
-
 CLIENT_ID = 'd2f27b893fb64c3a97242d8a1e46c63c'
 CLIENT_SECRET = '8d31ddeef0614731be0e6cef6aebaad3'
-
 sp = spotipy.Spotify(auth_manager=SpotifyClientCredentials(client_id=CLIENT_ID, client_secret=CLIENT_SECRET))
 
 def is_spotify_url(input_string):
@@ -25,64 +23,53 @@ def get_spotify_access_token():
         "Authorization": f"Basic {auth_b64}"
     }
     data = {"grant_type": "client_credentials"}
-    try:
-        response = requests.post(
-            "https://accounts.spotify.com/api/token",
-            headers=headers,
-            data=data
-        )
-        response.raise_for_status()
-        result = response.json()
-        return result["access_token"]
-    except Exception as e:
-        raise Exception("Error fetching Spotify access token: " + str(e))
-
-def get_spotify_track_details(url: str):
-    try:
-        response = requests.get(f"https://api.fabdl.com/spotify/get?url={url}")
-        response.raise_for_status()
-        result = response.json()
-        return result["result"]
-    except Exception as e:
-        raise Exception("Error fetching Spotify track details: " + str(e))
-
-def get_download_link(gid: str, track_id: str):
-    try:
-        response = requests.get(f"https://api.fabdl.com/spotify/mp3-convert-task/{gid}/{track_id}")
-        response.raise_for_status()
-        result = response.json()
-        
-        if result["result"]["status"] == 3 and result["result"]["download_url"]:
-            return f"https://api.fabdl.com{result['result']['download_url']}"
-        else:
-            raise Exception("Download not ready or failed")
-    except Exception as e:
-        raise Exception("Error fetching download link: " + str(e))
+    response = requests.post("https://accounts.spotify.com/api/token", headers=headers, data=data)
+    response.raise_for_status()
+    result = response.json()
+    return result["access_token"]
 
 def get_track_metadata(track_id):
-    try:
-        track = sp.track(track_id)
-        cover_art = track['album']['images'][0]['url'] if track['album']['images'] else None
-        duration_ms = track['duration_ms']
-        return {
-            'id': track['id'],
-            'title': track['name'],
-            'artists': ", ".join(artist['name'] for artist in track['artists']),
-            'album': track['album']['name'],
-            'release_date': track['album']['release_date'],
-            'duration': f"{duration_ms // 60000}:{(duration_ms % 60000) // 1000:02d}",
-            'isrc': track['external_ids'].get('isrc', 'N/A'),
-            'cover_art': cover_art
-        }
-    except Exception:
-        return None
+    track = sp.track(track_id)
+    cover_art = track['album']['images'][0]['url'] if track['album']['images'] else None
+    return {
+        'title': track['name'],
+        'artists': ", ".join(artist['name'] for artist in track['artists']),
+        'album': track['album']['name'],
+        'cover_art': cover_art,
+        'track_id': track['id'],
+        'track_url': f"https://open.spotify.com/track/{track['id']}",
+        'release_date': track['album']['release_date'],
+        'duration': f"{track['duration_ms'] // 60000}:{(track['duration_ms'] % 60000) // 1000:02d}",
+        'isrc': track['external_ids'].get('isrc', 'N/A')
+    }
 
-def search_spotify(query, limit=5):
-    try:
-        results = sp.search(q=query, type='track', limit=limit)
-        return [(track['name'], ", ".join(artist['name'] for artist in track['artists']), track['id']) for track in results['tracks']['items']]
-    except Exception:
-        return []
+def search_youtube(track_name, artists):
+    query = urllib.parse.quote(f"{track_name} {artists}")
+    response = requests.get(f"https://smartytdl.vercel.app/search?q={query}")
+    response.raise_for_status()
+    result = response.json()
+    if result.get("result") and len(result["result"]) > 0:
+        return result["result"][0]["link"]
+    raise Exception("No YouTube video found")
+
+def get_youtube_download_urls(youtube_url):
+    response = requests.get(f"https://smartytdl.vercel.app/dl?url={youtube_url}")
+    response.raise_for_status()
+    result = response.json()
+    if not result.get("success"):
+        raise Exception("Failed to fetch download links")
+    audio_formats = [
+        {
+            "format_id": media["formatId"],
+            "label": media["label"],
+            "url": media["url"],
+            "bitrate": media["bitrate"],
+            "extension": media["extension"]
+        }
+        for media in result["medias"]
+        if media["type"] == "audio"
+    ]
+    return audio_formats
 
 @app.route('/')
 def home():
@@ -93,49 +80,44 @@ def download_track():
     spotify_url = request.args.get('url')
     if not spotify_url or not is_spotify_url(spotify_url):
         return jsonify({
-            'status': False,
-            'message': 'Valid Spotify track URL required ❌',
-            'example': '/sp/dl?url=https://open.spotify.com/track/TRACK_ID'
+            'status': 'error',
+            'message': 'Valid Spotify track URL required',
+            'api_owner': '@ISmartCoder',
+            'api_updates': '@TheSmartDevs'
         }), 400
-    
     try:
         track_id = spotify_url.split('/track/')[1].split('?')[0]
         metadata = get_track_metadata(track_id)
         if not metadata:
             return jsonify({
-                'status': False,
-                'message': 'Failed to fetch metadata ❌'
+                'status': 'error',
+                'message': 'Failed to fetch metadata',
+                'api_owner': '@ISmartCoder',
+                'api_updates': '@TheSmartDevs'
             }), 500
-
-        track_details = get_spotify_track_details(spotify_url)
-        gid = str(track_details["gid"])
-        track_id = track_details["id"]
-        name = track_details["name"]
-        image = track_details["image"]
-        artists = track_details["artists"]
-        duration_ms = track_details["duration_ms"]
-
-        download_url = get_download_link(gid, track_id)
-        
+        youtube_url = search_youtube(metadata['title'], metadata['artists'])
+        audio_formats = get_youtube_download_urls(youtube_url)
         return jsonify({
-            'status': True,
-            'title': metadata['title'],
-            'artist': metadata['artists'],
-            'track_id': track_id,
-            'track_url': f"https://open.spotify.com/track/{track_id}",
-            'download_url': download_url,
+            'status': 'success',
+            'name': metadata['title'],
             'album': metadata['album'],
+            'artist': metadata['artists'],
+            'cover_url': metadata['cover_art'],
+            'track_id': metadata['track_id'],
+            'track_url': metadata['track_url'],
             'release_date': metadata['release_date'],
             'duration': metadata['duration'],
             'isrc': metadata['isrc'],
-            'cover_art': metadata['cover_art'],
-            'credit': 'Downloaded By @TheSmartDev And API Developer @TheSmartDev Organization github Oceans-11/TheSmartDevs'
+            'download_urls': audio_formats,
+            'api_owner': '@ISmartCoder',
+            'api_updates': '@TheSmartDevs'
         })
-
     except Exception as e:
         return jsonify({
-            'status': False,
-            'message': f'Error: {str(e)} ❌'
+            'status': 'error',
+            'message': f'Error: {str(e)}',
+            'api_owner': '@ISmartCoder',
+            'api_updates': '@TheSmartDevs'
         }), 500
 
 @app.route('/sp/search', methods=['GET'])
@@ -143,47 +125,50 @@ def search_tracks():
     query = request.args.get('q')
     if not query:
         return jsonify({
-            'status': False,
-            'message': 'Search query required ❌',
-            'example': '/sp/search?q=Tomake+Chai'
+            'status': 'error',
+            'message': 'Search query required',
+            'example': '/sp/search?q=Tomake+Chai',
+            'api_owner': '@ISmartCoder',
+            'api_updates': '@TheSmartDevs'
         }), 400
-    
     try:
-        tracks = search_spotify(query)
+        results = sp.search(q=query, type='track', limit=5)
+        tracks = [(track['name'], ", ".join(artist['name'] for artist in track['artists']), track['id']) for track in results['tracks']['items']]
         if not tracks:
             return jsonify({
-                'status': False,
-                'message': 'No tracks found ❌'
+                'status': 'error',
+                'message': 'No tracks found',
+                'api_owner': '@ISmartCoder',
+                'api_updates': '@TheSmartDevs'
             }), 404
-
-        results = []
+        results_list = []
         for name, artist, track_id in tracks:
-            track_url = f"https://open.spotify.com/track/{track_id}"
             metadata = get_track_metadata(track_id)
             if not metadata:
                 continue
-                
-            results.append({
+            results_list.append({
                 'title': name,
                 'artist': artist,
                 'track_id': track_id,
-                'track_url': track_url,
+                'track_url': f"https://open.spotify.com/track/{track_id}",
                 'album': metadata['album'],
                 'release_date': metadata['release_date'],
                 'duration': metadata['duration'],
                 'isrc': metadata['isrc'],
-                'cover_art': metadata['cover_art'],
+                'cover_art': metadata['cover_art']
             })
-
         return jsonify({
-            'status': True,
-            'results': results
+            'status': 'success',
+            'results': results_list,
+            'api_owner': '@ISmartCoder',
+            'api_updates': '@TheSmartDevs'
         })
-
     except Exception as e:
         return jsonify({
-            'status': False,
-            'message': f'Error: {str(e)} ❌'
+            'status': 'error',
+            'message': f'Error: {str(e)}',
+            'api_owner': '@ISmartCoder',
+            'api_updates': '@TheSmartDevs'
         }), 500
 
 if __name__ == '__main__':
